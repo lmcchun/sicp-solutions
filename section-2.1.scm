@@ -130,3 +130,30 @@
 
 (define (another-cdr z)
   (z (lambda (p q) q)))
+
+; ex 2.5
+(define (cons-1 a b)
+  (* (expt 2 a) (expt 3 b)))
+
+(define (car-1 c)
+  (if (= (remainder c 2) 0)
+      (+ 1 (car-1 (/ c 2)))
+      0))
+
+(define (cdr-1 c)
+  (if (= (remainder c 3) 0)
+      (+ 1 (cdr-1 (/ c 3)))
+      0))
+
+; ex 2.6
+(define zero (lambda (f) (lambda (x) x)))
+
+(define (add-1 n)
+  (lambda (f) (lambda (x) (f ((n f) x)))))
+
+(define one (lambda (f) (lambda (x) (f x))))
+
+(define two (lambda (f) (lambda (x) (f (f x)))))
+
+(define (plus n m)
+  (lambda (f) (lambda (x) ((m f) ((n f) x)))))
