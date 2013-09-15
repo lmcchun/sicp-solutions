@@ -218,3 +218,172 @@
       '()
       (cons (accumulate op init (map car seqs))
             (accumulate-n op init (map cdr seqs)))))
+
+; ex 2.37
+(define (dot-product v w)
+  (accumulate + 0 (map * v w)))
+
+(define (matrix-*-vector m v)
+  (map (lambda (row) (dot-product row v)) m))
+
+(define (transpose mat)
+  (accumulate-n cons '() mat))
+
+(define (matrix-*-matrix m n)
+  (let ((cols (transpose n)))
+    (map (lambda (row) (matrix-*-vector cols row)) m)))
+
+; ex 2.38
+(define (fold-right op initial sequence)
+  (if (null? sequence)
+      initial
+      (op (car sequence)
+          (fold-right op initial (cdr sequence)))))
+
+(define (fold-left op initial sequence)
+  (letrec ((iter (lambda (result rest)
+                   (if (null? rest)
+                       result
+                       (iter (op result (car rest))
+                             (cdr rest))))))
+    (iter initial sequence)))
+
+; ex 2.39
+(define (my-reverse-r sequence)
+  (fold-right (lambda (x y) (append y (list x))) '() sequence))
+
+(define (my-reverse-l sequence)
+  (fold-left (lambda (x y) (cons y x)) '() sequence))
+
+; ex 2.40
+(define (smallest-divisor n)
+  (find-divisor n 2))
+
+(define (find-divisor n test-divisor)
+  (cond ((> (square test-divisor) n) n)
+        ((divides? test-divisor n) test-divisor)
+        (else (find-divisor n (next-divisor test-divisor)))))
+
+(define (next-divisor test-divisor)
+  (if (= test-divisor 2)
+      3
+      (+ test-divisor 2)))
+
+(define (divides? a b)
+  (= (remainder b a) 0))
+
+(define (prime? n)
+  (and (> n 1) (= n (smallest-divisor n))))
+
+(define (flatmap proc seq)
+  (accumulate append '() (map proc seq)))
+
+(define (prime-sum? pair)
+  (prime? (+ (car pair) (cdr pair))))
+
+(define (make-pair-sum pair)
+  (list (car pair) (cdr pair) (+ (car pair) (cdr pair))))
+
+(define (permutations s)
+  (if (null? s)
+      (list '())
+      (flatmap (lambda (x)
+                 (map (lambda (p) (cons x p))
+                      (permutations (remove x s))))
+               s)))
+
+(define (remove item sequence)
+  (filter (lambda (x) (not (= x item)))
+          sequence))
+
+(define (filter predicate sequence)
+  (cond ((null? sequence) '())
+        ((predicate (car sequence))
+         (cons (car sequence)
+               (filter predicate (cdr sequence))))
+        (else (filter predicate (cdr sequence)))))
+
+(define (enumerate-interval low high)
+  (if (> low high)
+      '()
+      (cons low (enumerate-interval (+ low 1) high))))
+
+(define (unique-pairs n)
+  (flatmap
+   (lambda (i)
+     (map (lambda (j) (cons i j))
+          (enumerate-interval 1 (- i 1))))
+   (enumerate-interval 1 n)))
+
+(define (prime-sum-pairs n)
+  (map make-pair-sum
+       (filter prime-sum? (unique-pairs n))))
+
+; ex 2.41
+(define (filter-triple n s)
+  (filter
+   (lambda (triple)
+     (let ((i (car triple))
+           (j (cadr triple))
+           (k (caddr triple)))
+       (and (= (+ i j k) s)
+            (and (not (= i j))
+                 (not (= j k))
+                 (not (= k i))))))
+   (let ((lst (enumerate-interval 1 n)))
+     (flatmap
+      (lambda (i)
+        (flatmap
+         (lambda (j)
+           (map (lambda (k) (list i j k)) lst))
+         lst))
+      lst))))
+
+; ex 2.42
+(define empty-board '())
+
+(define (make-position row column)
+  (cons row column))
+
+(define (adjoin-position row column positions)
+  (cons (make-position row column) positions))
+
+(define (position-row position)
+  (car position))
+
+(define (position-column position)
+  (cdr position))
+
+(define (safe? k positions)
+  (if (null? positions)
+      #t
+      (let* ((recent-position (car positions))
+             (recent-position-row (position-row recent-position))
+             (recent-position-column (position-column recent-position)))
+        (fold-left
+         (lambda (result position)
+           (let ((row (position-row position))
+                 (column (position-column position)))
+             (and result
+                  (not (= recent-position-row row))
+                  (not (= (+ recent-position-row recent-position-column)
+                          (+ row column)))
+                  (not (= (- recent-position-row recent-position-column)
+                          (- row column))))))
+         #t
+         (cdr positions)))))
+
+(define (queens board-size)
+  (letrec ((queens-cols
+            (lambda (k)
+              (if (= k 0)
+                  (list empty-board)
+                  (filter
+                   (lambda (positions) (safe? k positions))
+                   (flatmap
+                    (lambda (rest-of-queens)
+                      (map (lambda (new-row)
+                             (adjoin-position new-row k rest-of-queens))
+                           (enumerate-interval 1 board-size)))
+                    (queens-cols (- k 1))))))))
+    (queens-cols board-size)))
