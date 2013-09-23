@@ -410,7 +410,7 @@
   (cond ((null? set) (list x))
         ((< (weight x) (weight (car set))) (cons x set))
         (else (cons (car set)
-                    (adjoin-set x (cdr set))))))
+                    (adjoin-huffman-set x (cdr set))))))
 
 (define (make-leaf-set pairs)
   (if (null? pairs)
@@ -456,3 +456,13 @@
 ; ex 2.69
 (define (generate-huffman-tree pairs)
   (successive-merge (make-leaf-set pairs)))
+
+(define (successive-merge leaf-set)
+  (cond ((null? leaf-set) '())
+        ((= (length leaf-set) 1) (car leaf-set))
+        (else
+         (successive-merge
+          (adjoin-huffman-set
+           (make-code-tree (car leaf-set)
+                           (cadr leaf-set))
+           (cddr leaf-set))))))
