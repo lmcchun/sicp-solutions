@@ -466,3 +466,22 @@
            (make-code-tree (car leaf-set)
                            (cadr leaf-set))
            (cddr leaf-set))))))
+
+; ex 2.70
+(define sample-pairs
+  '((A 2) (NA 16) (BOOM 1) (SHA 3) (GET 2) (YIP 9) (JOB 2) (WAH 1)))
+
+(define song
+  '(Get a job
+        Sha na na na na na na na na
+        Get a job
+        Sha na na na na na na na na
+        Wah yip yip yip yip yip yip yip yip yip
+        Sha boom))
+
+; ex 2.71
+(define sample-pairs-1
+  '((A 1) (B 2) (C 4) (D 8) (E 16)))
+
+(define sample-pairs-2
+  '((A 1) (B 2) (C 4) (D 8) (E 16) (F 32) (G 64) (H 128) (I 256) (J 512)))
