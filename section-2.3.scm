@@ -503,38 +503,6 @@
   (make-from-mag-ang (/ (magnitude z1) (magnitude z2))
                      (- (angle z1) (angle z2))))
 
-(define (real-part z) (car z))
-
-(define (imag-part z) (cdr z))
-
-(define (magnitude z)
-  (sqrt (+ (square (real-part z))
-           (square (imag-part z)))))
-
-(define (angle z)
-  (atan (imag-part z) (real-part z)))
-
-(define (make-from-real-imag x y) (cons x y))
-
-(define (make-from-mag-ang r a)
-  (cons (* r (cos a)) (* r (sin a))))
-
-(define (real-part z)
-  (* (magnitude z) (cos (angle z))))
-
-(define (imag-part z)
-  (* (magnitude z) (sin (angle z))))
-
-(define (magnitude z) (car z))
-
-(define (angle z) (cdr z))
-
-(define (make-from-real-imag x y)
-  (cons (sqrt (+ (square x) (square y)))
-        (atan y x)))
-
-(define (make-from-mag-ang r a) (cons r a))
-
 (define (attach-tag type-tag contents)
   (cons type-tag contents))
 
@@ -591,34 +559,6 @@
 (define (make-from-mag-ang-polar r a)
   (attach-tag 'polar (cons r a)))
 
-(define (real-part z)
-  (cond ((rectangular? z)
-         (real-part-rectangular (contents z)))
-        ((polar? z)
-         (real-part-polar (contents z)))
-        (else (error "Unknown type -- REAL-PART" z))))
-
-(define (imag-part z)
-  (cond ((rectangular? z)
-         (imag-part-rectangular (contents z)))
-        ((polar? z)
-         (imag-part-polar (contents z)))
-        (else (error "Unknown type -- IMAG-PART" z))))
-
-(define (magnitude z)
-  (cond ((rectangular? z)
-         (magnitude-rectangular (contents z)))
-        ((polar? z)
-         (magnitude-polar (contents z)))
-        (else (error "Unknown type -- IMAG-PART" z))))
-
-(define (angle z)
-  (cond ((rectangular? z)
-         (angle-rectangular (contents z)))
-        ((polar? z)
-         (angle-polar (contents z)))
-        (else (error "Unknown type -- ANGLE" z))))
-
 (define (make-from-real-imag x y)
   (make-from-real-rectangular x y))
 
@@ -647,3 +587,170 @@
       (put 'make-from-mag-ang 'rectangular
            (lambda (r a) (tag (make-from-mag-ang r a))))
       'done)))
+
+(define (install-polar-package)
+  ;;; internal procedures
+  (let* ((magnitude (lambda (z) (car z)))
+         (angle (lambda (z) (cdr z)))
+         (make-from-mag-ang (lambda (r a) (cons r a)))
+         (real-part (lambda (z)
+                      (* (magnitude z) (cos (angle z)))))
+         (imag-part (lambda (z)
+                      (* (magnitude z) (sin (angle z)))))
+         (make-from-real-imag (lambda (x y)
+                                (cons (sqrt (+ (square x) (square y)))
+                                      (atan y x)))))
+    ;;; interface to the rest of the system
+    (let ((tag (lambda (x) (attach-tag 'polar x))))
+      (put 'real-part '(polar) real-part)
+      (put 'imag-part '(polar) imag-part)
+      (put 'magnitude '(polar) magnitude)
+      (put 'angle '(polar) angle)
+      (put 'make-from-real-imag 'polar
+           (lambda (x y) (tag (make-from-real-imag x y))))
+      (put 'make-from-mag-ang 'polar
+           (lambda (r a) (tag (make-from-mag-ang r a))))
+      'done)))
+
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (error "No methon for these types -- APPLY-GENERIC" (list op type-tags))))))
+
+(define (make-from-real-imag x y)
+  ((get 'make-from-real-imag 'rectangular) x y))
+
+(define (make-from-mag-ang r a)
+  ((get 'make-from-mag-ang 'polar) r a))
+
+; ex 2.73
+(define (deriv exp var)
+  (cond ((number? exp) 0)
+        ((variable? exp) (if (same-variable? exp var) 1 0))
+        (else ((get 'deriv (operator exp)) (operands exp) var))))
+
+(define (operator exp) (car exp))
+
+(define (operands exp) (cdr exp))
+
+(define (install-sum-package)
+  ;;; internal procedures
+  (let* ((addend (lambda (s) (car s)))
+         (augend (lambda (s) (cadr s)))
+         (make-sum (lambda (x y)
+                     (cond ((=number? x 0) y)
+                           ((=number? y 0) x)
+                           ((and (number? x) (number? y)) (+ x y))
+                           (else (attach-tag '+ (list x y))))))
+         (deriv (lambda (exp var)
+                  (make-sum (deriv (addend exp) var)
+                            (deriv (augend exp) var)))))
+    ;;; interface to the rest of the system
+    (put 'addend '+ addend)
+    (put 'augend '+ augend)
+    (put 'make-sum '+ make-sum)
+    (put 'deriv '+ deriv)
+    'done))
+
+(define (addend sum)
+  ((get 'addend '+) (contents sum)))
+
+(define (augend sum)
+  ((get 'augend '+) (contents sum)))
+
+(define (make-sum x y)
+  ((get 'make-sum '+) x y))
+
+(define (install-product-package)
+  ;;; internal procedures
+  (let* ((multiplier (lambda (s) (car s)))
+         (multiplicand (lambda (s) (cadr s)))
+         (make-product (lambda (x y)
+                         (cond ((or (=number? x 0) (=number? y 0)) 0)
+                               ((=number? x 1) y)
+                               ((=number? y 1) x)
+                               (else (attach-tag '* (list x y))))))
+         (deriv (lambda (exp var)
+                  (make-sum
+                   (make-product (multiplier exp)
+                                 (deriv (multiplicand exp) var))
+                   (make-product (deriv (multiplier exp) var)
+                                 (multiplicand exp))))))
+    ;;; interface to the rest of the system
+    (put 'multiplier '* multiplier)
+    (put 'multiplicand '* multiplicand)
+    (put 'make-product '* make-product)
+    (put 'deriv '* deriv)
+    'done))
+
+(define (multiplier s)
+  ((get 'multiplier '*) (contents s)))
+
+(define (multiplicand s)
+  ((get 'multiplicand '*) (contents s)))
+
+(define (make-product x y)
+  ((get 'make-product '*) x y))
+
+(define (install-exponentiation-package)
+  ;;; internal procedures
+  (let* ((base (lambda (s) (car s)))
+         (exponent (lambda (s) (cadr s)))
+         (make-exponentiation (lambda (b e)
+                                (cond ((= e 0) 1)
+                                      ((= e 1) b)
+                                      ((and (number? b) (number? e)) (expt b e))
+                                      (else (attach-tag '** (list b e))))))
+         (deriv (lambda (exp var)
+                  (let ((b (base exp))
+                        (e (exponent exp)))
+                    (make-product e
+                                  (make-product
+                                   (make-exponentiation b (- e 1))
+                                   (deriv b var)))))))
+    ;;; interface to the rest of the system
+    (put 'base '** base)
+    (put 'exponent '** exponent)
+    (put 'make-exponentiation '** make-exponentiation)
+    (put 'deriv '** deriv)
+    'done))
+
+(define (base s)
+  ((get 'base '**) (contents s)))
+
+(define (exponent s)
+  ((get 'exponent '**) (contents s)))
+
+(define (make-exponentiation b e)
+  ((get 'make-exponentiation '**) b e))
+
+; ex 2.74
+(define (make-generic-file division file)
+  (list division file))
+
+(define (division-of-genericc-file gf)
+  (car gf))
+
+(define (file-of-generic-file gf)
+  (cadr gf))
+
+(define (get-record employee file)
+  ((get 'get-record
+        (division-of-generic-file file))
+   employee
+   (file-of-generic-file file)))
+
+(define (get-salary employee)
+  ((get 'get-salary
+        (division-of-generic-employee employee))
+   (employee-of-generic-employee employee)))
+
+(define (find-employee-record employee file-list)
+  (if (null? file-list)
+      '()
+      (let ((record (get-record employee (car file-list))))
+        (if (null? record)
+            (find-employee-record employee (cdr file-list))
+            record))))
