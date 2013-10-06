@@ -943,3 +943,190 @@
                             (t2->t1 (apply-generic op a1 (t2->t1 a2)))
                             (else (error "No method for these types" (list op type-tags)))))))
               (error "No method for these types" (list op type-tags)))))))
+
+; ex 2.82
+(define (apply-generic op .args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (letrec ((f (lambda (target-type lst result)
+                        (if (null? lst)
+                            result
+                            (let ((x (car lst))
+                                  (source-type (type-tag x)))
+                              (if (eq? source-type target-type)
+                                  (f target-type (cdr lst) (cons x result))
+                                  (let ((coercion (get-coercion source-type target-type)))
+                                    (if coercion
+                                        (f target-type (cdr lst) (cons (coercion x) result))
+                                        '())))))))
+                   (g (lambda (lst)
+                        (if (null? lst)
+                            (error "No method for these types" (list op type-tags))
+                            (let ((coercion-args (f (type-tag (car lst)) args '())))
+                              (if coercion-args
+                                  (let ((proc1 (get op (map type-tag coercion-args))))
+                                    (if proc1
+                                        (apply proc1 (map contents coercion-args))
+                                        (g (cdr lst))))))))))
+            (g type-tags))))))
+
+; ex 2.83
+(define (integer->rational n)
+  (make-rational n 1))
+
+(define (rational->real r)
+  (make-real
+   (exact->inexact
+    (/ (numer r) (denom r)))))
+
+(define (real->complex r)
+  (make-complex-from-real-imag r 0))
+
+(define (install-raise)
+  (put 'raise '(integer)
+       (lambda (i) (integer->rational i)))
+  (put 'raise '(rational)
+       (lambda (r) (rational->real r)))
+  (put 'raise '(real)
+       (lambda (r) (real->complex r))))
+  
+(define (raise x)
+  (apply-generic 'raise x))
+
+; ex 2.84
+(define (level type)
+  (cond ((eq? type 'integer) 0)
+        ((eq? type 'rational) 1)
+        ((eq? type 'real) 2)
+        ((eq? type 'complex) 3)
+        (else (error "Invalid type: LEVEL" type))))
+
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (apply proc (map contents args))
+          (let ((no-method (lambda ()
+                             (error "No method for these types" (list op type-tags)))))
+            (if (not (null? (cdr args))) ; length of args > 1
+                (let ((raised-args (raise-to-common args)))
+                  (if raised-args
+                      (let ((proc (get op (map type-tag raised-args))))
+                        (if proc
+                            (apply proc (map contents raised-args))
+                            (no-method)))
+                      (no-method)))
+                (no-method)))))))
+
+(define (raise-to-common args)
+  (let ((highest (highest-type args)))
+    (let ((raised-args
+           (map (lambda (x) (raise-to-type highest x)) args)))
+      (if (all-true? raised-args)
+          raised-args
+          #f))))
+
+(define (all-true? lst)
+  (cond ((null? lst) #t)
+        ((car lst) (all-true? (cdr lst)))
+        (else #f)))
+
+(define (raise-to-type type item)
+  (let ((item-type (type-tag item)))
+    (if (eq? item-type type)
+        item
+        (let ((raise-fn (get 'raise (list item-type))))
+          (if raise-fn
+              (raise-to-type type (raise-fn item))
+              #f)))))
+
+(define (highest-type args)
+  (if (null? (cdr args))
+      (type-tag (car args))
+      (let ((t1 (type-tag (car args)))
+            (t2 (highest-type (cdr args))))
+        (let ((l1 (level t1))
+              (l2 (level t2)))
+          (if (> l1 l2)
+              l1
+              l2)))))
+
+; ex 2.85
+(define (install-project)
+  (put 'project '(rational)
+       (lambda (r)
+         (make-scheme-number
+          (round (/ (numer r) (denom r))))))
+  (put 'project '(real)
+       (lambda (r)
+         (let ((scheme-rat
+                (rationalize
+                 (inexact->exact r) 1/100)))
+           (make-rational
+            (numerator scheme-rat)
+            (denominator scheme-rat)))))
+  (put 'project '(complex)
+       (lambda (c) (make-real (real-part c)))))
+
+(define (drop num)
+  (let ((project-proc
+         (get 'project (list (type-tag num)))))
+    (if project-proc
+        (let ((dropped (project-proc (contents num))))
+          (if (equ? num (raise dropped))
+              (drop dropped)
+              num))
+        num)))
+
+(define (apply-generic op . args)
+  (let ((type-tags (map type-tag args)))
+    (let ((proc (get op type-tags)))
+      (if proc
+          (drop (apply proc (map contents args)))
+          (let ((no-method (lambda ()
+                             (error "No method for these types" (list op type-tags)))))
+            (if (not (null? (cdr args))) ; length of args > 1
+                (let ((raised-args (raise-to-common args)))
+                  (if raised-args
+                      (let ((proc (get op (map type-tag raised-args))))
+                        (if proc
+                            (drop (apply proc (map contents raised-args)))
+                            (no-method)))
+                      (no-method)))
+                (no-method)))))))
+
+; ex 2.86
+(define (install-sine-cosine)
+  (put 'sine 'scheme-number
+       (lambda (x) (attach-tag 'scheme-number (sin x))))
+  (put 'cosine 'scheme-number
+       (lambda (x) (attach-tag 'scheme-number (cos x))))
+  (put 'sine 'rational
+       (lambda (x) (attach-tag 'rational (sin x))))
+  (put 'cosine 'rational
+       (lambda (x) (attach-tag 'rational (cos x)))))
+
+(define (sine x) (apply-generic 'sine x)) 
+
+(define (cosine x) (apply-generic cosine x)) 
+
+;; To accomodate generic number in the complex package,  
+;; we should replace operators such as + , * with theirs 
+;; generic counterparts add, mul.
+(define (add-complex z1 z2)
+  (make-from-real-imag (add (real-part z1) (real-part z2))
+                       (add (imag-part z1) (imag-part z2))))
+
+(define (sub-complex z1 z2)
+  (make-from-real-imag (sub (real-part z1) (real-part z2))
+                       (sub (imag-part z1) (imag-part z2))))
+
+(define (mul-complex z1 z2)
+  (make-from-mag-ang (mul (magnitude z1) (magnitude z2))
+                     (add (angle z1) (angle z2))))
+
+(define (div-complex z1 z2)
+  (make-from-mag-ang (div (magnitude z1) (magnitude z2))
+                     (sub (angle z1) (angle z2))))
