@@ -98,3 +98,17 @@
 
 ;(define rand (rand-maker))
 
+; ex 3.7
+(define (make-joint account password-a password-b)
+  (lambda (p m)
+    (if (eq? p password-b)
+	(account password-a m)
+	(error "Incorrect password" ""))))
+
+; ex 3.8
+(define f
+  ((lambda ()
+     (let ((init 1))
+       (lambda (num)
+	 (set! init (* init num))
+	 init)))))
