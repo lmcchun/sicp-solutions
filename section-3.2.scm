@@ -191,8 +191,8 @@
 		   (set-cdr! local-table
 			     (cons (list key-1
 					 (cons key-2 value))
-				   (cdr local-table))))))
-	   'ok))
+				   (cdr local-table)))))
+	     'ok)))
       (lambda (m)
 	(cond ((eq? m 'lookup-proc) lookup)
 	      ((eq? m 'insert-proc!) insert!)
@@ -231,10 +231,48 @@
 		   (set-cdr! local-table
 			     (cons (list key-1
 					 (cons key-2 value))
-				   (cdr local-table))))))
-	   'ok))
+				   (cdr local-table)))))
+	     'ok)))
       (lambda (m)
 	(cond ((eq? m 'lookup-proc) lookup)
 	      ((eq? m 'insert-proc!) insert!)
 	      (else (error "Unknown operation -- TABLE" m)))))))
 
+; ex 3.25 TODO
+(define (make-generalized-table)
+  (let ((local-table (list '*table*)))
+    (let-rec ((lookup
+	       (lambda (table key-list)
+		 (let ((record (assoc (car key-list) (cdr table)))
+		       (key-list-tail (cdr key-list)))
+		   (if record
+		       (if (null? key-list-tail)
+			   (cdr record)
+			   (lookup record key-list-tail))
+		       #f))))
+	      (gen-record
+	       (lambda (key-list value)
+		 (if (null? key-list)
+		     value
+		     (list (car key-list)
+			   (gen-record (cdr key-list) value)))))
+	      (insert!
+	       (lambda (table key-list value)
+		 (let ((key-list-head (car key-list))
+		       (key-list-tail (cdr key-list))
+		       (record (assoc key-list-head (cdr table))))
+		   (if record
+		       (if (null? key-list-tail)
+			   (set-cdr! record value)
+			   (insert! record key-list-tail value))
+		       (set-cdr! record
+				 (cons (list key-list-head
+					     (gen-record key-list-tail value))
+				       (cdr record)))))
+		 'ok)))
+	     (lambda (m)
+	       (cond ((eq? m 'lookup-proc)
+		      (lambda (key-list) (lookup local-table key-list)))
+		     ((eq? m 'insert-proc!)
+		      (lambda (key-list value) (insert! local-table key-list value)))
+		     (else (error "Unknown operation -- TABLE" m)))))))
