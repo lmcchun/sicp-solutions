@@ -247,13 +247,13 @@
 		      (key-list-tail (cdr key-list)))
 		  (if record
 		      (if (null? key-list-tail)
-			  (car (cdr record))
+			  (cdr (assoc '() (cdr record)))
 			  (lookup record key-list-tail))
 		      #f))))
 	     (gen-record
 	      (lambda (key-list value)
 		(if (null? key-list)
-		    value
+		    (cons '() value)
 		    (list (car key-list)
 			  (gen-record (cdr key-list) value)))))
 	     (insert!
@@ -263,7 +263,7 @@
 		       (record (assoc key-list-head (cdr table))))
 		  (if record
 		      (if (null? key-list-tail)
-			  (set-cdr! record value)
+			  (set-cdr! (assoc '() (cdr record)) value)
 			  (insert! record key-list-tail value))
 		      (set-cdr! table
 				(cons (list key-list-head
