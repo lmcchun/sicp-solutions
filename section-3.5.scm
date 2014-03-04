@@ -41,3 +41,15 @@
 	       (stream-filter pred
 			      (stream-cdr stream))))
 	(else (stream-filter pred (stream-cdr stream)))))
+
+(define (force delayed-object)
+  (delayed-object))
+
+(define (memo-proc proc)
+  (let ((already-run? #f) (result #f))
+    (lambda ()
+      (if (not already-run?)
+	  (begin (set! result (proc))
+		 (set! already-run? #t)
+		 result)
+	  result))))
