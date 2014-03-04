@@ -1,4 +1,0 @@
-(define (stream-ref s n)
-  (if (= n 0)
-      (stream-car a)
-      (stream-ref (stream-cdf s) (- n 1))))
