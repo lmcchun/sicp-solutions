@@ -250,3 +250,6 @@
 (define (accelerated-sequence transform s)
   (stream-map stream-car
 	      (make-tableau transform s)))
+
+; ex 3.64
+(define (stream-limit stream tolerance))
