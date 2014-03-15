@@ -456,8 +456,8 @@
 (define (integral integrand initial-value dt)
   (let ((int
 	 (cons-stream initial-value
-		      (add-streams (scale-stream integrand dt)
-				   int))))))
+		      (add-streams (scale-stream integrand dt)))))
+    int))
 
 ; ex 3.73
 (define (RC R C dt)
@@ -478,12 +478,12 @@
    (make-zero-crossings (stream-cdr input-stream)
 			(stream-car input-stream))))
 
-(define zero-crossings (make-zero-crossings sense-data 0))
+;; (define zero-crossings (make-zero-crossings sense-data 0))
 
-(define zero-crossings
-  (stream-map sign-change-detector
-	      sense-data
-	      (cons-stream 0 sense-data)))
+;; (define zero-crossings
+;;   (stream-map sign-change-detector
+;; 	      sense-data
+;; 	      (cons-stream 0 sense-data)))
 
 ; ex 3.75
 (define (make-zero-crossings input-stream last-value last-avpt)
@@ -505,3 +505,55 @@
     (stream-map sign-change-detector
 		transformed
 		(cons-stream 0 transformed))))
+
+;
+(define (integral delayed-integrand initial-value dt)
+  (letrec ((int
+	    (cons-stream initial-value
+			 (let ((integrand (force delayed-integrand)))
+			   (add-streams (scale-stream integrand dt)
+					int)))))
+    int))
+
+(define (solve f y0 dt)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (stream-map f y))
+  y)
+
+; ex 3.77
+(define (integral delayed-integrand initial-value dt)
+  (cons-stream initial-value
+	       (let ((integrand (force delayed-integrand)))
+		 (if (stream-null? integrand)
+		     the-empty-stream
+		     (integral (stream-cdr integrand)
+			       (+ (* dt (stream-car integrand))
+				  initial-value)
+			       dt)))))
+
+; ex 3.78
+(define (solve-2nd a b y0 dy0 dt)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (integral (delay ddy) dy0 dt))
+  (define ddy (add-streams (scale-stream dy a)
+			   (scale-stream y b)))
+  y)
+
+; ex 3.79
+(define (solve-2nd f y0 dy0 dt)
+  (define y (integral (delay dy) y0 dt))
+  (define dy (integral (delay ddy) dy0 dt))
+  (define ddy (stream-map f dy y))
+  y)
+
+; ex 3.80
+(define (RLC R L C dt)
+  (let ((rlc-model
+	 (lambda (vC0 iL0)
+	   (letrec ((iL (integral (delay diL) iL0 dt))
+		    (vC (integral (delay dvC) vC0 dt))
+		    (diL (add-streams (scale-stream vC (/ 1 L))
+				      (scale-stream iL (- (/ R L)))))
+		    (dvC (scale-stream iL (/ -1 C))))
+	     (cons iL vC)))))
+    rlc-model))
