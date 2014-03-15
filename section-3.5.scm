@@ -291,3 +291,163 @@
 		 (newline)
 		 (display-n-stream-elements (stream-cdr stream) (- n 1))))
       'ok))
+
+;
+(define (interleave s1 s2)
+  (if (stream-null? s1)
+      s2
+      (cons-stream (stream-car s1)
+		   (interleave s2 (stream-cdr s1)))))
+
+(define (pairs s t)
+  (cons-stream
+   (list (stream-car s) (stream-car t))
+   (interleave
+    (stream-map (lambda (x) (list (stream-car s) x))
+		(stream-cdr t))
+    (pairs (stream-cdr s) (stream-cdr t)))))
+
+
+; ex 3.67
+(define (all-pairs s t)
+  (cons-stream
+   (list (stream-car s1) (stream-car s2))
+   (interleave
+    (stream-map
+     (lambda (x) (list (stream-car s1) x))
+     (stream-cdr s2))
+    (interleave
+     (stream-map
+      (lambda (x) (list x (stream-car s2)))
+      (stream-cdr s1))
+     (all-pairs (stream-cdr s1) (stream-cdr s2))))))
+
+; ???
+(define (all-pairs-1 s t)
+  (cons-stream
+   (list (stream-car s) (stream-car t))
+   (interleave
+    (stream-map (lambda (x) (list (stream-car s) x))
+		(stream-cdr t))
+    (pairs (stream-cdr s) t))))
+
+; ex 3.69
+(define (triples s t u)
+  (cons-stream
+   (list (stream-car s) (stream-car t) (stream-car u))
+   (interleave
+    (stream-map
+     (lambda (x) (cons (stream-car s) x))
+     (stream-cdr (pairs t u)))
+    (triples (stream-cdr s) (stream-cdr t) (stream-cdr u)))))
+
+(define pythagorean
+  (stream-filter
+   (lambda (triplet)
+     (= (+ (square (car triplet))
+	   (square (cadr triplet)))
+	(square (caddr triplet))))
+   (triples integers integers integers)))
+
+; ex 3.70
+(define (merge-weighted weight s1 s2)
+  (cond ((stream-null? s1) s2)
+	((stream-null? s2) s1)
+	(else
+	 (let ((s1car (stream-car s1))
+	       (s2car (stream-car s2)))
+	   (cond ((<= (weight s1car) (weight s2car))
+		  (cons-stream s1car
+			       (merge-weighted weight (stream-cdr s1) s2)))
+		 (else
+		  (cons-stream s2car
+			       (merge-weighted weight s1 (stream-cdr s2)))))))))
+
+(define (weighted-pairs weight s1 s2)
+  (cons-stream
+   (list (stream-car s1) (stream-car s2))
+   (merge-weighted
+    weight
+    (stream-map (lambda (x) (list (stream-car s1) x))
+		(stream-cdr s2))
+    (weighted-pairs weight (stream-cdr s1) (stream-cdr s2)))))
+
+(define sump
+  (weighted-pairs (lambda (p) (+ (car p) (cadr p)))
+		  integers
+		  integers))
+
+(define s235
+  (let ((stream
+	 (stream-filter (lambda (number)
+			  (or (= (remainder number 2) 0)
+			      (= (remainder number 3) 0)
+			      (= (remainder number 5) 0)))
+			integers)))
+    (weighted-pairs
+     (lambda (p)
+       (let ((i (car p)) (j (cadr p)))
+	 (+ (* 2 i) (* 3 j) (* 5 i j))))
+     stream
+     stream)))
+
+; ex 3.71
+(define (cube-sum p)
+  (let ((i (car p)) (j (cadr p)))
+    (+ (* i i i) (* j j j))))
+
+(define cubew
+  (weighted-pairs cube-sum integers integers))
+
+(define (ramanujan stream max-count)
+  (if (> max-count 0)
+      (let* ((head (stream-car stream))
+	     (currrent-cube-sum (cube-sum head))
+	     (rest (stream-cdr stream))
+	     (next (stream-car rest)))
+	(if (= currrent-cube-sum (cube-sum next))
+	    (begin (display "(")
+		   (display currrent-cube-sum)
+		   (display " ")
+		   (display head)
+		   (display " ")
+		   (display next)
+		   (display ")")
+		   (newline)
+		   (ramanujan (stream-cdr stream) (- max-count 1)))
+	    (ramanujan (stream-cdr stream) max-count)))
+      'ok))
+
+; ex 3.72
+(define (square-sum p)
+  (+ (square (car p)) (square (cadr p))))
+
+(define squarew
+  (weighted-pairs
+   square-sum
+   integers
+   integers))
+
+(define (squares-3ways stream max-count)
+  (if (> max-count 0)
+      (let* ((head (stream-car stream))
+	     (currrent-square-sum (square-sum head))
+	     (rest (stream-cdr stream))
+	     (second (stream-car rest))
+	     (third (stream-car (stream-cdr rest))))
+	(if (= currrent-square-sum
+	       (square-sum second)
+	       (square-sum third))
+	    (begin (display "(")
+		   (display currrent-square-sum)
+		   (display " ")
+		   (display head)
+		   (display " ")
+		   (display second)
+		   (display " ")
+		   (display third)
+		   (display ")")
+		   (newline)
+		   (squares-3ways (stream-cdr stream) (- max-count 1)))
+	    (squares-3ways (stream-cdr stream) max-count)))
+      'ok))
