@@ -451,3 +451,57 @@
 		   (squares-3ways (stream-cdr stream) (- max-count 1)))
 	    (squares-3ways (stream-cdr stream) max-count)))
       'ok))
+
+;
+(define (integral integrand initial-value dt)
+  (let ((int
+	 (cons-stream initial-value
+		      (add-streams (scale-stream integrand dt)
+				   int))))))
+
+; ex 3.73
+(define (RC R C dt)
+  (let ((rc-model
+	 (lambda (v0 i-stream)
+	   (add-streams
+	    (scale-stream i-stream R)
+	    (integral
+	     (scale-stream i-stream (/ 1 C))
+	     v0
+	     dt)))))
+    rc-model))
+
+; ex 3.74
+(define (make-zero-crossings input-stream last-value)
+  (cons-stream
+   (sign-change-detector (stream-car input-stream) last-value)
+   (make-zero-crossings (stream-cdr input-stream)
+			(stream-car input-stream))))
+
+(define zero-crossings (make-zero-crossings sense-data 0))
+
+(define zero-crossings
+  (stream-map sign-change-detector
+	      sense-data
+	      (cons-stream 0 sense-data)))
+
+; ex 3.75
+(define (make-zero-crossings input-stream last-value last-avpt)
+  (let ((avpt (/ (+ (stream-car input-stream) last-value) 2)))
+    (cons-stream (sign-change-detector avpt last-avpt)
+		 (make-zero-crossings (stream-cdr input-stream)
+				      (stream-car input-stream)
+				      avpt))))
+
+; ex 3.76
+(define (smooth s)
+  (stream-map
+   (lambda (x1 x2) (/ (+ x1 x2) 2))
+   (cons-stream 0 s)
+   x))
+
+(define (make-zero-crossings input-stream transform last-value)
+  (let ((transformed (transform input-stream)))
+    (stream-map sign-change-detector
+		transformed
+		(cons-stream 0 transformed))))
