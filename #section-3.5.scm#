@@ -615,14 +615,7 @@
 ; ex 3.82
 (define (monte-carlo experiment-stream)
   (letrec ((iter
-	    (lambda (experiment-stream passed failed)
-	      (let ((experiment (stream-car experiment-stream)))
-		(if (experiment)
-		    (cons-stream (cons (+ passed 1) failed)
-				 (iter (stream-cdr experiment-stream) (+ passed 1) failed))
-		    (cons-stream (cons passed (+ failed 1))
-				 (iter (stream-cdr experiment-stream) passed (+ failed 1))))))))
-    (iter experiment-stream 0 0)))
+	    (lambda (experiment-stream p))))))
 
 ; 假如 random-float-number-generator 生成小于给定参数的随机数流
 
