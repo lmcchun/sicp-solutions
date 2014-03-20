@@ -60,6 +60,7 @@
     env)
   'ok)
 
+; ex 4.1
 (define (left-to-right-eval-list-of-values exps env)
   (if (no-operands? exps)
       '()
@@ -78,6 +79,7 @@
 	(cons (eval (first-operand exps) env)
 	      rest-values))))
 
+;
 (define (self-evaluating? exp)
   (cond ((number? exp) #t)
 	((string? exp) #t)
@@ -189,3 +191,34 @@
 
 (define (rest-operands ops)
   (cdr ops))
+
+(define (cond? exp)
+  (tagged-list? exp 'cond))
+
+(define (cond-clauses exp)
+  (cdr exp))
+
+(define (cond-else-clause? clause)
+  (eq? (cond-predicate clause) 'else))
+
+(define (cond-predicate clause)
+  (car clause))
+
+(define (cond-actions clause)
+  (cdr clause))
+
+(define (cond-if exp)
+  (expand-clauses (cond-clauses exp)))
+
+(define (expand-clauses clauses)
+  (if (null? clauses)
+      'false ; clause else no
+      (let ((first (car clauses))
+	    (rest (cdr clauses)))
+	(if (cond-else-clause? first)
+	    (if (null? rest)
+		(sequence->exp (cond-actions first))
+		(error "ELSE clause isn't last -- COND->IF" clauses))
+	    (make-if (cond-predicate first)
+		     (sequence->exp (cond-actions first))
+		     (expand-clauses rest))))))
