@@ -14,6 +14,7 @@
 	((cond? exp) (eval (cond->if exp) env))
 	((and? exp) (eval-and exp env)) ; ((and? exp) (eval (and->if exp) env))
 	((or? exp) (eval-or exp env)) ; ((or? exp) (eval (or->if exp) env))
+	((let? exp) (eval (let->combination exp) env))
 	((application? exp)
 	 (apply (eval (operator exp) env)
 		(list-of-values (operands exp) env)))
@@ -303,13 +304,53 @@
 		(if (eq? (cadr first) '=>) ; XXX
 		    (if (null? (cddr first))
 			(error "Error clause -- COND-IF" first)
-			(make-if (extended-cond-test first)
-					; XXX
-					; 求值 (extended-cond-test first) 不能有副作用.
-					; 或先求值 (extended-cond-test first), 并把它赋某个变量 (类似 let).
-				 (list (extended-cond-recipient first)
-				       (extended-cond-test first))
-				 (expand-cond-clauses rest)))
+			(list (make-lambda '(test) ; (expand-cond-clauses rest) 只求值一次. XXX
+					   (make-if 'test
+						    (list (extended-cond-recipient first)
+							  'test)
+						    (expand-cond-clauses rest)))
+			      (extended-cond-test first)))
 		    (make-if (cond-predicate first)
 			     (sequence->exp (cond-actions first))
 			     (expand-cond-clauses rest))))))))
+
+; ex 4.6
+(define (let? exp)
+  (tagged-list? exp 'let))
+
+(define (map proc lst)
+  (if (null? lst)
+      '()
+      (cons (proc (car lst))
+	    (map proc (cdr lst)))))
+
+(define (let-vars exp)
+  (map car (cadr exp)))
+
+(define (let-inits exp)
+  (map cadr (cadr exp)))
+
+(define (let-body exp)
+  (cddr exp))
+
+(define (let->combination exp)
+  (cons (make-lambda (let-vars exp)
+		     (let-body exp))
+	(let-inits exp)))
+
+; ex 4.7
+(define (let*-body exp)
+  (cddr exp))
+
+(define (make-let initforms body)
+  (cons 'let (cons initforms body)))
+
+(define (let*->nested-lets exp)
+  (let ((body (let*-body exp)))
+    (letrec ((make-rec-let
+	      (lambda (initforms)
+		(if (null? initforms)
+		    (make-let '() body)
+		    (make-let (car initforms)
+			      (list (make-rec-let (cdr initforms))))))))
+      (make-rec-let (cadr exp)))))
