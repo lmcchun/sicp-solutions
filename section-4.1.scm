@@ -12,6 +12,8 @@
 	((begin? exp)
 	 (eval-sequence (begin-actions exp) env))
 	((cond? exp) (eval (cond->if exp) env))
+	((and? exp) (eval-and exp env)) ; ((and? exp) (eval (and->if exp) env))
+	((or? exp) (eval-or exp env)) ; ((or? exp) (eval (or->if exp) env))
 	((application? exp)
 	 (apply (eval (operator exp) env)
 		(list-of-values (operands exp) env)))
@@ -208,9 +210,9 @@
   (cdr clause))
 
 (define (cond-if exp)
-  (expand-clauses (cond-clauses exp)))
+  (expand-cond-clauses (cond-clauses exp)))
 
-(define (expand-clauses clauses)
+(define (expand-cond-clauses clauses)
   (if (null? clauses)
       'false ; clause else no
       (let ((first (car clauses))
@@ -221,6 +223,93 @@
 		(error "ELSE clause isn't last -- COND->IF" clauses))
 	    (make-if (cond-predicate first)
 		     (sequence->exp (cond-actions first))
-		     (expand-clauses rest))))))
+		     (expand-cond-clauses rest))))))
 
-; ex 4.4
+; ex 4.5
+(define (and? exp)
+  (tagged-list? exp 'and))
+
+(define (eval-and exp env)
+  (letrec ((iter
+	    (lambda (operands)
+	      (if (no-operands? operands)
+		  'true
+		  (let ((first (first-operand operands))
+			(rest (rest-operands operands)))
+		    (if (true? (eval first env))
+			(if (null? rest)
+			    first
+			    (iter rest))
+			'false))))))
+    (iter (operands exp))))
+
+(define (and->if exp)
+  (expand-and-operands (operands exp)))
+
+(define (expand-and-operands operands)
+  (if (no-operands? operands)
+      'true
+      (let ((first (first-operand operands))
+	    (rest (rest-operands operands)))
+	(if (no-operands? rest)
+	    (make-if first first 'false)
+	    (make-if first
+		     (expand-and-operands rest)
+		     'false)))))
+
+(define (or? exp)
+  (tagged-list? exp 'or))
+
+(define (eval-or exp env)
+  (letrec ((iter
+	    (lambda (operands)
+	      (if (no-operands? operands)
+		  'false
+		  (if (true? (eval (first-operand operands) env))
+		      'true
+		      (iter (rest-operands operands)))))))
+    (iter (operands exp))))
+
+(define (or->if exp)
+  (expand-or-operands (operands exp)))
+
+(define (expand-or-operands operands)
+  (if (no-operands? operands)
+      'false
+      (let ((first (first-operand operands))
+	    (rest (rest-operands operands)))
+	(make-if first 'true (expand-or-operands rest)))))
+
+; ex 4.6
+(define (extended-cond-test clause)
+  (car clause))
+
+(define (extended-cond-recipient clause)
+  (caddr clause))
+
+(define (expand-cond-clauses clauses)
+  (if (null? clauses)
+      'false ; clause else no
+      (let ((first (car clauses))
+	    (rest (cdr clauses)))
+	(if (cond-else-clause? first)
+	    (if (null? rest)
+		(sequence->exp (cond-actions first))
+		(error "ELSE clause isn't last -- COND->IF" clauses))
+	    (if (null? (cdr first))
+		(make-if (cond-predicate first)
+			 'true
+			 (expand-cond-clauses rest))
+		(if (eq? (cadr first) '=>) ; XXX
+		    (if (null? (cddr first))
+			(error "Error clause -- COND-IF" first)
+			(make-if (extended-cond-test first)
+					; XXX
+					; 求值 (extended-cond-test first) 不能有副作用.
+					; 或先求值 (extended-cond-test first), 并把它赋某个变量 (类似 let).
+				 (list (extended-cond-recipient first)
+				       (extended-cond-test first))
+				 (expand-cond-clauses rest)))
+		    (make-if (cond-predicate first)
+			     (sequence->exp (cond-actions first))
+			     (expand-cond-clauses rest))))))))
