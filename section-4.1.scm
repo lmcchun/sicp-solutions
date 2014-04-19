@@ -15,6 +15,7 @@
 	((and? exp) (eval-and exp env)) ; ((and? exp) (eval (and->if exp) env))
 	((or? exp) (eval-or exp env)) ; ((or? exp) (eval (or->if exp) env))
 	((let? exp) (eval (let->combination exp) env))
+	((let*? exp) (eval (let*->nested-lets exp) env))
 	((application? exp)
 	 (apply (eval (operator exp) env)
 		(list-of-values (operands exp) env)))
@@ -339,6 +340,9 @@
 	(let-inits exp)))
 
 ; ex 4.7
+(define (let*? exp)
+  (tagged-list? exp 'let*))
+
 (define (let*-body exp)
   (cddr exp))
 
@@ -354,3 +358,61 @@
 		    (make-let (car initforms)
 			      (list (make-rec-let (cdr initforms))))))))
       (make-rec-let (cadr exp)))))
+
+; ex 4.8
+(define (named-let? exp)
+  (let ((second (cadr exp)))
+    (and (not (pair? second))
+	 (not (null? second)))))
+
+(define (named-let-name exp)
+  (cadr exp))
+
+(define (named-let-vars exp)
+  (let-vars (cdr exp)))
+
+(define (named-let-inits exp)
+  (let-inits (cdr exp)))
+
+(define (named-let-body exp)
+  (let-body (cdr exp)))
+
+(define (let->combination exp)
+  (if (named-let? exp)
+      (sequence->exp
+       (list
+	(list 'define
+	      (cons (named-let-name exp) (named-let-vars exp))
+	      (named-let-body exp))
+	(cons (named-let-name exp)
+	      (named-let-inits exp))))
+      (cons (make-lambda (let-vars exp)
+			 (let-body exp))
+	    (let-inits exp))))
+
+; ex 4.9
+(define (while? exp)
+  (tagged-list? exp 'while))
+
+(define (while-condition exp)
+  (cadr exp))
+
+(define (while-body exp)
+  (caddr exp))
+
+; ???
+(define (while->combination exp)
+  (sequence->exp
+   (list
+    (list
+     'define
+     (list 'while-iter)
+     (make-if
+      (while-condition exp)
+      (sequence->exp
+       (list
+	(while-body exp)
+	(list 'while-iter)))
+      'true))
+    (list 'while-iter))))
+; ((while? exp) (eval (while->combination exp) env))
