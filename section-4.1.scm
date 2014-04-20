@@ -194,7 +194,7 @@
   (null? ops))
 
 (define (first-operand ops)
-  (cdr ops))
+  (car ops))
 
 (define (rest-operands ops)
   (cdr ops))
@@ -428,7 +428,7 @@
   (eq? x 'false))
 
 (define (make-procedure parameters body env)
-  (list 'procedure prarameters body env))
+  (list 'procedure parameters body env))
 
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
@@ -581,6 +581,8 @@
 
 (define output-prompt ";;; M-Eval value: ")
 
+(define the-global-environment (setup-environment))
+
 (define (driver-loop)
   (prompt-for-input input-prompt)
   (let ((input (read)))
@@ -602,5 +604,3 @@
 		     (procedure-body object)
 		     '<procedure-env>))
       (display object)))
-
-(define the-global-environment (setup-environment))
