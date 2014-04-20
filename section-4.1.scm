@@ -558,7 +558,12 @@
   (list (list 'car car)
 	(list 'cdr cdr)
 	(list 'cons cons)
-	(list 'null? null?)
+	;(list 'null? null?)
+	(list 'null?
+	      (lambda (x)
+		(if (null? x)
+		    'true
+		    'false)))
 	(list '+ +)
 	(list '- -)
 	(list '* *)
