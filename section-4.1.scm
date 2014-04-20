@@ -16,6 +16,7 @@
 	((or? exp) (eval-or exp env)) ; ((or? exp) (eval (or->if exp) env))
 	((let? exp) (eval (let->combination exp) env))
 	((let*? exp) (eval (let*->nested-lets exp) env))
+	((make-unbound? exp) (unbind-variable! exp env))
 	((application? exp)
 	 (apply (eval (operator exp) env)
 		(list-of-values (operands exp) env)))
@@ -509,3 +510,28 @@
 	  (frame-values frame))))
 
 ; ex 4.13
+(define (unbind-var-in-frame! var frame)
+  "Unbinds a variable in the frame."
+  (let ((vars (frame-variables frame))
+	(vals (frame-values frame))
+	(new-vars '())
+	(new-vals '()))
+    (letrec ((loop
+	      (lambda (vars vals)
+		(if (not (null? vars))
+		    (begin
+		      (if (not (eq? (car vars) var))
+			  (begin (set! new-vars
+				       (cons (car vars) new-vars))
+				 (set! new-vals
+				       (cons (car vals) new-vals))))
+		      (loop (cdr vars) (cdr vals)))))))
+      (loop vars vals)
+      (set-car! frame new-vars)
+      (set-cdr! frame new-vals))))
+
+(define (make-unbound? exp)
+  (tagged-list? exp 'make-unbound?))
+
+(define (unbind-variable! exp env)
+  (unbind-var-in-frame! (first-frame env) (cadr exp)))
