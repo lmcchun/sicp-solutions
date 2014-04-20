@@ -507,3 +507,5 @@
 	    (else (scan (cdr vars) (cdr vals)))))
     (scan (frame-variables frame)
 	  (frame-values frame))))
+
+; ex 4.13
