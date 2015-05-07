@@ -1,6 +1,6 @@
 ; ex 1.16
-(define (even? n)
-  (= (remainder n 2) 0))
+;(define (even? n)
+;  (= (remainder n 2) 0))
 
 (define (square n)
   (* n n))
