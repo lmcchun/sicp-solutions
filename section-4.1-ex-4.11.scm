@@ -1,11 +1,5 @@
 ;
-(define (map proc lst)
-  (if (null? lst)
-      '()
-      (cons (proc (car lst))
-	    (map proc (cdr lst)))))
-
-(define (make-framme variables values)
+(define (make-frame variables values)
   (let ((variable-num (length variables))
 	(value-num (length values)))
     (if (< variable-num value-num)

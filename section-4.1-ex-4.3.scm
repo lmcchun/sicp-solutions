@@ -1,25 +1,25 @@
 (define (make-table)
   (let ((local-table (list '*table*)))
     (let* ((lookup
-	    (lambda (key)
-	      (let ((record (assoc key (cdr local-table))))
-		(if record
-		    (cdr record)
-		    #f))))
-	   (insert!
-	    (lambda (key value)
-	      (let ((record (assoc key (cdr local-table))))
-		(if record
-		    (set-cdr! record value)
-		    (set-cdr! local-table
-			      (cons (cons key value)
-				    (cdr local-table)))))))
-	   (dispatch
-	    (lambda (m)
-	      (cond ((eq? m 'lookup-proc) lookup)
-		    ((eq? m 'insert-proc!) insert!)
-		    (else
-		     (error "Unknown operation -- TABLE" m))))))
+            (lambda (key)
+              (let ((record (assoc key (cdr local-table))))
+                (if record
+                   (cdr record)
+                   #f))))
+           (insert!
+            (lambda (key value)
+              (let ((record (assoc key (cdr local-table))))
+                (if record
+                   (set-cdr! record value)
+                   (set-cdr! local-table
+                            (cons (cons key value)
+                                 (cdr local-table)))))))
+           (dispatch
+            (lambda (m)
+              (cond ((eq? m 'lookup-proc) lookup)
+                   ((eq? m 'insert-proc!) insert!)
+                   (else
+                    (error "Unknown operation -- TABLE" m))))))
       dispatch)))
 
 (define operation-table (make-table))
@@ -30,8 +30,8 @@
 
 (define (tagged-list? exp tag)
   (if (pair? exp)
-      (eq? (car exp) tag)
-      #f))
+     (eq? (car exp) tag)
+     #f))
 
 (define (text-of-quotation exp)
   (cadr exp))
@@ -47,24 +47,24 @@
 
 (define (eval-assignment exp env)
   (set-variable-value! (assignment-variable exp)
-		       (eval (assignment-value exp) env)
-		       env))
+                      (eval* (assignment-value exp) env)
+                      env))
 
 (define (definition-variable exp)
   (if (symbol? (cadr exp))
-      (cadr exp)
-      (caadr exp)))
+     (cadr exp)
+     (caadr exp)))
 
 (define (definition-value exp)
   (if (symbol? (cadr exp))
-      (caddr exp)
-      (make-lambda (cadar exp) ; formal parameters
-		   (cddr exp)))) ; body
+     (caddr exp)
+     (make-lambda (cadar exp) ; formal parameters
+                 (cddr exp)))) ; body
 
 (define (eval-definition exp env)
   (define-variable!
     (definition-variable exp)
-    (eval (definition-value exp) env)
+    (eval* (definition-value exp) env)
     env)
   'ok)
 
@@ -76,13 +76,13 @@
 
 (define (if-alternative exp)
   (if (not (null? (cdddr exp)))
-      (cadddr exp)
-      'false)) ; 'false or #f
+     (cadddr exp)
+     'false)) ; 'false or #f
 
 (define (eval-if exp env)
-  (if (true? (eval (if-predicate exp) env))
-      (eval (if-consequent exp) env)
-      (eval (if-alternative exp) env)))
+  (if (true? (eval* (if-predicate exp) env))
+     (eval* (if-consequent exp) env)
+     (eval* (if-alternative exp) env)))
 
 (define (lambda-parameters exp)
   (cadr exp))
@@ -106,12 +106,23 @@
   (cdr seq))
 
 (define (eval-sequence exps env)
-  (cond ((last-exp? exps) (eval (first-exp exps) env))
-	(else (eval (first-exp exps) env)
-	      (eval-sequence (rest-exps exps) env))))
+  (cond ((last-exp? exps) (eval* (first-exp exps) env))
+       (else (eval* (first-exp exps) env)
+            (eval-sequence (rest-exps exps) env))))
 
 (define (eval-begin exp env)
   (eval-sequence (begin-actions exp) env))
+
+(define (eval-cond exp env)
+  (let ((exps (cdr exp))
+        (iter
+         (lambda (exps)
+           (if (null? exps)
+              'nil
+              (if (true? (eval* (car (first-exp exps)) env))
+                 (eval* (cadr (first-exp exps)) env)
+                 (iter (rest-exps exps)))))))
+    (iter exps)))
 
 (put 'quote eval-quoted)
 (put 'set! eval-assignment)
@@ -123,8 +134,8 @@
 
 (define (self-evaluating? exp)
   (cond ((number? exp) #t)
-	((string? exp) #t)
-	(else #f)))
+       ((string? exp) #t)
+       (else #f)))
 
 (define (variable? exp)
   (symbol? exp))
@@ -138,14 +149,14 @@
 (define (operands exp)
   (cddr exp))
 
-(define (eval exp env)
+(define (eval* exp env)
   (cond ((self-evaluating? exp) exp)
-	((variable? exp)
-	 (lookup-variable-value exp env))
-	((get (car exp))
-	 ((get (car exp)) exp env))
-	((application? exp)
-	 (apply (eval (operator exp) env)
-		(list-of-values (operands exp) env)))
-	(else
-	 (error "Unknown expression in EVAL: " exp))))
+       ((variable? exp)
+        (lookup-variable-value exp env))
+       ((get (car exp))
+        ((get (car exp)) exp env))
+       ((application? exp)
+        (apply (eval* (operator exp) env)
+              (list-of-values (operands exp) env)))
+       (else
+        (error "Unknown expression in EVAL: " exp))))
