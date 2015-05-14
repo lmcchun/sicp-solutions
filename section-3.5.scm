@@ -1,3 +1,5 @@
+(#%require (only racket/base random))
+
 (define the-empty-stream '())
 
 (define stream-null? null?)
@@ -34,7 +36,7 @@
   (car stream))
 
 (define (stream-cdr stream)
-  (force* (cdr stream)))
+  (force (cdr stream)))
 
 (define (stream-enumerate-interval low high)
   (if (> low high)
@@ -50,9 +52,6 @@
                     (stream-filter pred
                                   (stream-cdr stream))))
        (else (stream-filter pred (stream-cdr stream)))))
-
-(define (force* delayed-object)
-  (delayed-object))
 
 (define (memo-proc proc)
   (let ((already-run? #f) (result #f))
@@ -71,14 +70,6 @@
       (apply proc (map stream-car argstreams))
       (apply stream-map
             (cons proc (map stream-cdr argstreams))))))
-
-(define the-empty-stream '())
-
-(define-syntax cons-stream
-  (syntax-rules ()
-    ((_ first second) (cons first (delay second)))))
-
-(define stream-null? null?)
 
 ;
 (define (integers-starting-from n)
@@ -510,7 +501,7 @@
 (define (integral delayed-integrand initial-value dt)
   (letrec ((int
             (cons-stream initial-value
-                        (let ((integrand (force* delayed-integrand)))
+                        (let ((integrand (force delayed-integrand)))
                           (add-streams (scale-stream integrand dt)
                                       int)))))
     int))
@@ -523,7 +514,7 @@
 ; ex 3.77
 (define (integral delayed-integrand initial-value dt)
   (cons-stream initial-value
-              (let ((integrand (force* delayed-integrand)))
+              (let ((integrand (force delayed-integrand)))
                 (if (stream-null? integrand)
                    the-empty-stream
                    (integral (stream-cdr integrand)
@@ -559,6 +550,13 @@
     rlc-model))
 
 ;
+(define random-init
+  120)
+
+(define (rand-update x)
+  (let ((a 27) (b 26) (m 127))
+    (modulo (+ (* a x) b) m)))
+
 (define rand
   (let ((x random-init))
     (lambda ()
@@ -569,14 +567,14 @@
   (cons-stream random-init
               (stream-map rand-update random-numbers)))
 
-(define cesaro-stream
-  (map-successive-pairs (lambda (r1 r2) (= (gcd r1 r2) 1))
-                       random-numbers))
-
 (define (map-successive-pairs f s)
   (cons-stream
    (f (stream-car s) (stream-car (stream-cdr s)))
    (map-successive-pairs f (stream-cdr (stream-cdr s)))))
+
+(define cesaro-stream
+  (map-successive-pairs (lambda (r1 r2) (= (gcd r1 r2) 1))
+                       random-numbers))
 
 (define (monte-carlo experiment-stream passed failed)
   (let ((next
@@ -613,30 +611,24 @@
              (error "bad command -- " command))))))
 
 ; ex 3.82
-(define (monte-carlo experiment-stream)
-  (letrec ((iter
-            (lambda (experiment-stream passed failed)
-              (let ((experiment (stream-car experiment-stream)))
-                (if (experiment)
-                   (cons-stream (cons (+ passed 1) failed)
-                               (iter (stream-cdr experiment-stream) (+ passed 1) failed))
-                   (cons-stream (cons passed (+ failed 1))
-                               (iter (stream-cdr experiment-stream) passed (+ failed 1))))))))
-    (iter experiment-stream 0 0)))
+(define (random-in-range low high)
+  (let ((range (- high low)))
+    (+ low (* (random) range))))
 
-; 假如 random-float-number-generator 生成小于给定参数的随机数流
+(define (random-number-pairs low1 high1 low2 high2)
+  (cons-stream
+   (cons (random-in-range low1 high1)
+        (random-in-range low2 high2))
+   (random-number-pairs low1 high1 low2 high2)))
 
-(define (estimate-integral P x1 x2 y1 y2)
-  (let ((area (* (- x2 x1) (- y2 y1))))
-    (let ((test-stream
-           (stream-map (lambda (x y) (lambda () (P x y)))
-                      (stream-map (lambda (offset) (+ low offset))
-                                 (random-float-number-generator (- x2 x1)))
-                      (stream-map (lambda (offset) (+ low offset))
-                                 (random-float-number-generator (- y2 y1))))))
-      (scale-stream (monte-carlo test-stream) area))))
+(define (estimate-integral pred x1 x2 y1 y2)
+  (let ((area (* (- x2 x1) (- y2 y1)))
+        (randoms (random-number-pairs x1 x2 y1 y2)))
+    (scale-stream (monte-carlo (stream-map pred randoms) 0 0) area)))
 
 (define estimate-pi-stream
-  (let ((unit-pred (lambda (x y)
-                     (<= (+ (square x) (square y)) 1))))
+  (let ((unit-pred
+         (lambda (p)
+           (<= (+ (square (car p))
+                 (square (cdr p))) 1))))
     (estimate-integral unit-pred -1.0 1.0 -1.0 1.0)))
