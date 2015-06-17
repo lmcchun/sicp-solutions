@@ -181,6 +181,23 @@
 (define (cond->if exp)
   (expand-cond-clauses (cond-clauses exp)))
 
+(define (let? exp)
+  (tagged-list? exp 'let))
+
+(define (let-vars exp)
+  (map car (cadr exp)))
+
+(define (let-body exp)
+  (cddr exp))
+
+(define (let-inits exp)
+  (map cadr (cadr exp)))
+
+(define (let->combination exp)
+  (cons (make-lambda (let-vars exp)
+                     (let-body exp))
+        (let-inits exp)))
+
 (define (application? exp)
   (pair? exp))
 
@@ -251,6 +268,7 @@
         ((lambda? exp) (analyze-lambda exp))
         ((begin? exp) (analyze-sequence (begin-actions exp)))
         ((cond? exp) (analyze (cond->if exp)))
+        ((let? exp) (analyze (let->combination exp)))
         ((application? exp) (analyze-application exp))
         (else
          (error "Unknown expression type -- ANALYZE" exp))))
