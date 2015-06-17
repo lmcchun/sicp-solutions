@@ -575,6 +575,11 @@
         (list '- -)
         (list '* *)
         (list '/ /)
+        (list '=
+              (lambda (a b)
+                (if (= a b)
+                    'true
+                    'false)))
         ; 其他基本过程
         ))
 
