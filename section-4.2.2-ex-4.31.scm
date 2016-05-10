@@ -1,20 +1,30 @@
 (define apply-in-underlying-scheme apply) ; 保存基础 apply 的一个引用
 
+(define (error msg val)
+  (display msg)
+  (display val)
+  (newline))
+
 (define (force-it obj)
   (cond ((thunk? obj)
-	 (let ((result (actual-value
-			(thunk-exp obj)
-			(thunk-env obj))))
-	   (set-car! obj 'evaluated-thunk)
-	   (set-car! (cdr obj) result) ; replace exp with its value
-	   (set-cdr! (cdr obj) '())
-	   result))
-	((evaluated-thunk? obj)
-	 (thunk-value obj))
-	(else obj)))
+         (actual-value (thunk-exp obj) (thunk-env obj)))
+        ((memo-thunk? obj)
+         (let ((result (actual-value
+                        (memo-thunk-exp obj)
+                        (memo-thunk-env obj))))
+           (set-car! obj 'evaluated-thunk)
+           (set-car! (cdr obj) result) ; replace exp with its value
+           (set-cdr! (cdr obj) '())
+           result))
+        ((evaluated-thunk? obj)
+         (evaluated-thunk-value obj))
+        (else obj)))
 
 (define (delay-it exp env)
   (list 'thunk exp env))
+
+(define (delay-memo-it exp env)
+  (list 'memo-thunk exp env))
 
 (define (thunk? obj)
   (tagged-list? obj 'thunk))
@@ -25,10 +35,19 @@
 (define (thunk-env thunk)
   (caddr thunk))
 
+(define (memo-thunk? obj)
+  (tagged-list? obj 'memo-thunk))
+
+(define (memo-thunk-exp thunk)
+  (cadr thunk))
+
+(define (memo-thunk-env thunk)
+  (caddr thunk))
+
 (define (evaluated-thunk? obj)
   (tagged-list? obj 'evaluated-thunk))
 
-(define (thunk-value evaluated-thunk)
+(define (evaluated-thunk-value evaluated-thunk)
   (cadr evaluated-thunk))
 
 (define (actual-value exp env)
@@ -38,15 +57,38 @@
   (if (no-operands? exps)
       '()
       (cons (actual-value (first-operand exps) env)
-	    (list-of-arg-values (rest-operands exps)
-				env))))
+            (list-of-arg-values (rest-operands exps)
+                                env))))
 
 (define (list-of-delayed-args exps env)
   (if (no-operands? exps)
       '()
       (cons (delay-it (first-operand exps) env)
-	    (list-of-delayed-args (rest-operands exps)
-				  env))))
+            (list-of-delayed-args (rest-operands exps)
+                                  env))))
+
+(define (list-of-params parameters)
+  (if (null? parameters)
+      '()
+      (let ((first-param (car parameters)))
+        (if (symbol? first-param)
+            (cons first-param (list-of-params (cdr parameters)))
+            (cons (car first-param) (list-of-params (cdr parameters)))))))
+
+(define (list-of-args parameters exps env)
+  (if (null? parameters)
+      '()
+      (let ((first-param (car parameters)))
+        (cons
+         (if (symbol? first-param)
+             (actual-value (first-operand exps) env)
+             (let ((param-type (cadr first-param)))
+               (cond ((eq? param-type 'lazy)
+                      (delay-it (first-operand exps) env))
+                     ((eq? param-type 'lazy-memo)
+                      (delay-memo-it (first-operand exps) env))
+                     (else (error "Invalid parameter type" param-type)))))
+         (list-of-args (cdr parameters) (rest-operands exps) env)))))
 
 (define (eval* exp env)
   (cond ((self-evaluating? exp) exp)
@@ -70,22 +112,23 @@
         ((application? exp)
          (apply* (actual-value (operator exp) env)
                  (operands exp)
-		 env))
+                 env))
         (else
          (error "Unknown expression type -- EVAL" exp))))
 
 (define (apply* procedure arguments env)
   (cond ((primitive-procedure? procedure)
          (apply-primitive-procedure
-	  procedure
-	  (list-of-arg-values arguments env))) ; changed
+          procedure
+          (list-of-arg-values arguments env))) ; changed
         ((compound-procedure? procedure)
          (eval-sequence
           (procedure-body procedure)
-          (extend-environment
-           (procedure-parameters procedure)
-           (list-of-delayed-args arguments env) ; changed
-           (procedure-environment procedure))))
+          (let ((parameters (procedure-parameters procedure)))
+            (extend-environment
+             (list-of-params parameters)
+             (list-of-args parameters arguments env)
+             (procedure-environment procedure)))))
         (else
          (error "Unknown procedure type -- APPLY" procedure))))
 
@@ -625,6 +668,8 @@
                 (if (= a b)
                     'true
                     'false)))
+        (list 'display display)
+        (list 'newline newline)
         ; 其他基本过程
         ))
 

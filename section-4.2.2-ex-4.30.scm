@@ -102,7 +102,7 @@
 
 (define (eval-sequence exps env)
   (cond ((last-exp? exps) (eval* (first-exp exps) env))
-        (else (eval* (first-exp exps) env)
+        (else (actual-value (first-exp exps) env)
               (eval-sequence (rest-exps exps) env))))
 
 (define (eval-assignment exp env)
@@ -725,3 +725,8 @@
              (list 'set! (car initform) (cadr initform)))
            initforms)
       body))))
+
+; ex 4.30
+; a) 正文中的方法会求值 begin 表达式中的每一条子表达式
+; c) 求值 begin 表达式的子表达式不可能生成 thunk 或者 evaluated-thunk
+; d) ???
